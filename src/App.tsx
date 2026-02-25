@@ -46,11 +46,18 @@ function App() {
 
   const handleImportSql = (sql: string) => {
     try {
-      // Detect if SQL contains ALTER TABLE statements
+      // Detect SQL statement types
       const hasAlter = /^\s*ALTER\s+TABLE/im.test(sql);
       const hasCreate = /^\s*CREATE\s+TABLE/im.test(sql);
+      const hasDrop = /^\s*DROP\s+TABLE/im.test(sql);
 
-      if (hasAlter && !hasCreate) {
+      if (hasDrop && !hasCreate && !hasAlter) {
+        // Pure DROP TABLE — extract table names and remove from schema
+        const dropMatches = [...sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_`"'.]+)/gi)];
+        const dropIds = new Set(dropMatches.map((m) => m[1].replace(/[`"']/g, '').split('.').pop() ?? ''));
+        if (dropIds.size > 0) handleTableDelete(dropIds);
+        setIsModalOpen(false);
+      } else if (hasAlter && !hasCreate) {
         // Pure ALTER TABLE — apply to existing schema
         const newSchema = applyAlterStatements(schema, sql);
         setSchema(newSchema);
@@ -130,6 +137,7 @@ function App() {
           onClose={() => setIsAiSidebarOpen(false)}
           onImportSql={handleImportSql}
           onApplyAlter={handleApplyAlter}
+          onDropTable={handleTableDelete}
         />
       </div>
 

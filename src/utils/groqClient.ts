@@ -50,6 +50,7 @@ Guidelines:
 - When you provide SQL CREATE TABLE statements, wrap them in a markdown code block with \`\`\`sql tag
 - When the user asks to ADD, DROP, MODIFY, or RENAME a column/table, or add/remove a foreign key or primary key, generate ALTER TABLE statements wrapped in a \`\`\`sql block
 - You CAN generate ALTER TABLE statements for: ADD COLUMN, DROP COLUMN, MODIFY COLUMN, RENAME COLUMN, RENAME TO, ADD CONSTRAINT (FOREIGN KEY / PRIMARY KEY), DROP FOREIGN KEY, DROP CONSTRAINT
+- When the user asks to delete or remove a whole table, generate a DROP TABLE statement wrapped in a \`\`\`sql block
 - Be concise but thorough
 - Respond in the same language the user writes in (Thai or English)
 `.trim();

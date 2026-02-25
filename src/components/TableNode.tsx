@@ -6,6 +6,7 @@ import type { Theme } from '../types/theme';
 export interface TableNodeData extends Record<string, unknown> {
     schema: TableSchema;
     theme?: Theme;
+    onDelete?: (tableId: string) => void;
 }
 
 interface TableNodeProps {
@@ -98,13 +99,25 @@ const TableNode = ({ data, isConnectable }: TableNodeProps) => {
     const s = THEME_STYLES[data.theme ?? 'dark'];
 
     return (
-        <div className={`min-w-[240px] rounded-xl overflow-hidden shadow-xl border backdrop-blur-sm transition-colors duration-300 ${s.cardBg}`}>
+        <div className={`min-w-[240px] rounded-xl overflow-hidden shadow-xl border backdrop-blur-sm transition-colors duration-300 group ${s.cardBg}`}>
             {/* Table Header */}
             <div className={`flex items-center gap-2 px-4 py-3 transition-colors duration-300 ${s.headerBg}`}>
                 <svg className={`w-4 h-4 shrink-0 opacity-80 ${s.headerText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18M3 14h18M3 18h18" />
                 </svg>
-                <span className={`font-semibold text-sm tracking-wide ${s.headerText}`}>{name}</span>
+                <span className={`font-semibold text-sm tracking-wide flex-1 ${s.headerText}`}>{name}</span>
+                {/* Delete button — visible on hover */}
+                {data.onDelete && (
+                    <button
+                        onClick={() => (data.onDelete as (id: string) => void)(data.schema.id)}
+                        title={`Drop table ${name}`}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 shrink-0"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
             {/* Column Rows */}
