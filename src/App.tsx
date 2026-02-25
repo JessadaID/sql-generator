@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import SqlDiagram from './components/SqlDiagram';
+import { useRef, useState } from 'react';
+import SqlDiagram, { type SqlDiagramHandle } from './components/SqlDiagram';
 import Sidebar from './components/Sidebar';
 import AiChatSidebar from './components/AiChatSidebar';
 import ImportModal from './components/ImportModal';
@@ -8,6 +8,7 @@ import AppHeader from './components/AppHeader';
 import { sampleSchema } from './data/sampleSchema';
 import type { Theme, BackgroundType } from './types/theme';
 import type { ForeignKey, SqlSchema } from './types/schema';
+import type { ExportFormat } from './utils/imageExporter';
 import { parseSqlToSchema } from './utils/sqlParser';
 
 // Generate a unique key for deduplicating foreign keys
@@ -37,6 +38,11 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [schema, setSchema] = useState<SqlSchema>(sampleSchema);
+  const diagramRef = useRef<SqlDiagramHandle>(null);
+
+  // Capture the diagram image via the ref exposed by SqlDiagram
+  const handleCaptureImage = (format: ExportFormat, bg?: string) =>
+    diagramRef.current?.captureImage(format, bg) ?? Promise.reject(new Error('Diagram not ready'));
 
   const handleImportSql = (sql: string) => {
     try {
@@ -89,7 +95,7 @@ function App() {
 
         {/* Diagram canvas */}
         <main className="flex-1 h-full overflow-hidden">
-          <SqlDiagram schema={schema} theme={theme} bgType={bgType} onTableDelete={handleTableDelete} />
+          <SqlDiagram ref={diagramRef} schema={schema} theme={theme} bgType={bgType} onTableDelete={handleTableDelete} />
         </main>
 
         {/* AI Chat Sidebar (right) */}
@@ -114,6 +120,7 @@ function App() {
         onClose={() => setIsExportModalOpen(false)}
         schema={schema}
         theme={theme}
+        onCaptureImage={handleCaptureImage}
       />
     </div>
   );
