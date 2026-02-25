@@ -9,7 +9,7 @@ import { sampleSchema } from './data/sampleSchema';
 import type { Theme, BackgroundType } from './types/theme';
 import type { ForeignKey, SqlSchema } from './types/schema';
 import type { ExportFormat } from './utils/imageExporter';
-import { parseSqlToSchema } from './utils/sqlParser';
+import { parseSqlToSchema, applyAlterStatements } from './utils/sqlParser';
 
 // Generate a unique key for deduplicating foreign keys
 const fkKey = (fk: ForeignKey) => `${fk.fromTable}.${fk.fromColumn}->${fk.toTable}.${fk.toColumn}`;
@@ -46,13 +46,32 @@ function App() {
 
   const handleImportSql = (sql: string) => {
     try {
-      const newSchema = parseSqlToSchema(sql);
-      if (newSchema.tables.length === 0) {
-        alert('No tables found in the provided SQL. Please check your syntax.');
-        return;
+      // Detect if SQL contains ALTER TABLE statements
+      const hasAlter = /^\s*ALTER\s+TABLE/im.test(sql);
+      const hasCreate = /^\s*CREATE\s+TABLE/im.test(sql);
+
+      if (hasAlter && !hasCreate) {
+        // Pure ALTER TABLE — apply to existing schema
+        const newSchema = applyAlterStatements(schema, sql);
+        setSchema(newSchema);
+        setIsModalOpen(false);
+      } else if (hasAlter && hasCreate) {
+        // Mixed: apply CREATE TABLE first, then ALTER TABLE on top
+        const created = parseSqlToSchema(sql);
+        const merged = mergeSchemas(schema, created);
+        const altered = applyAlterStatements(merged, sql);
+        setSchema(altered);
+        setIsModalOpen(false);
+      } else {
+        // Pure CREATE TABLE
+        const newSchema = parseSqlToSchema(sql);
+        if (newSchema.tables.length === 0) {
+          alert('No tables found in the provided SQL. Please check your syntax.');
+          return;
+        }
+        setSchema((prev) => mergeSchemas(prev, newSchema));
+        setIsModalOpen(false);
       }
-      setSchema((prev) => mergeSchemas(prev, newSchema));
-      setIsModalOpen(false);
     } catch (err) {
       console.error(err);
       alert('Failed to parse SQL.');
@@ -74,6 +93,11 @@ function App() {
     if (window.confirm('ต้องการลบตารางทั้งหมดออกจาก diagram ใช่ไหม?')) {
       setSchema({ tables: [], foreignKeys: [] });
     }
+  };
+
+  // Apply ALTER TABLE statements to current schema
+  const handleApplyAlter = (newSchema: SqlSchema) => {
+    setSchema(newSchema);
   };
 
   return (
@@ -105,6 +129,7 @@ function App() {
           theme={theme}
           onClose={() => setIsAiSidebarOpen(false)}
           onImportSql={handleImportSql}
+          onApplyAlter={handleApplyAlter}
         />
       </div>
 
