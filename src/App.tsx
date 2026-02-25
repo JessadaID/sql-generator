@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import SqlDiagram from './components/SqlDiagram';
 import Sidebar from './components/Sidebar';
+import AiChatSidebar from './components/AiChatSidebar';
 import ImportModal from './components/ImportModal';
+import ExportModal from './components/ExportModal';
 import AppHeader from './components/AppHeader';
 import { sampleSchema } from './data/sampleSchema';
 import type { Theme, BackgroundType } from './types/theme';
@@ -31,7 +33,9 @@ function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [bgType, setBgType] = useState<BackgroundType>('dots');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [schema, setSchema] = useState<SqlSchema>(sampleSchema);
 
   const handleImportSql = (sql: string) => {
@@ -60,31 +64,55 @@ function App() {
     }));
   };
 
+  const handleClearAll = () => {
+    if (window.confirm('ต้องการลบตารางทั้งหมดออกจาก diagram ใช่ไหม?')) {
+      setSchema({ tables: [], foreignKeys: [] });
+    }
+  };
+
   return (
     <div className={`w-screen h-screen flex flex-col transition-colors duration-300 ${APP_STYLES[theme]}`}>
       <AppHeader
         theme={theme}
         bgType={bgType}
         isSidebarOpen={isSidebarOpen}
+        isAiOpen={isAiSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
+        onToggleAi={() => setIsAiSidebarOpen((open) => !open)}
         onSetTheme={setTheme}
         onSetBgType={setBgType}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden flex flex-row relative">
-        <Sidebar isOpen={isSidebarOpen} theme={theme} onImportClick={() => setIsModalOpen(true)} />
+        <Sidebar isOpen={isSidebarOpen} theme={theme} onImportClick={() => setIsModalOpen(true)} onExportClick={() => setIsExportModalOpen(true)} onClearClick={handleClearAll} />
 
         {/* Diagram canvas */}
         <main className="flex-1 h-full overflow-hidden">
           <SqlDiagram schema={schema} theme={theme} bgType={bgType} onTableDelete={handleTableDelete} />
         </main>
+
+        {/* AI Chat Sidebar (right) */}
+        <AiChatSidebar
+          isOpen={isAiSidebarOpen}
+          schema={schema}
+          theme={theme}
+          onClose={() => setIsAiSidebarOpen(false)}
+          onImportSql={handleImportSql}
+        />
       </div>
 
       <ImportModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onImport={handleImportSql}
+        theme={theme}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        schema={schema}
         theme={theme}
       />
     </div>

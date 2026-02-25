@@ -1,73 +1,96 @@
-# React + TypeScript + Vite
+# SQL Generator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based SQL schema diagram editor built with React, TypeScript, and Vite. The application allows developers to visually design, import, and export relational database schemas, with an integrated AI assistant powered by Groq for schema advice and SQL generation.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Schema Diagram Editor
+- Visual representation of database tables and their relationships
+- Interactive drag-and-drop canvas powered by React Flow
+- Foreign key relationship lines rendered automatically between tables
+- Support for dark and light themes, as well as background pattern options
 
-## React Compiler
+### Import SQL
+- Paste raw `CREATE TABLE` SQL statements to generate a diagram
+- Upload a `.sql` file directly from your file system
+- Supports primary keys, foreign keys, constraints, and common column types
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Export SQL
+- View the generated `CREATE TABLE` SQL code for the current schema
+- Copy SQL to clipboard
+- Download as a `.sql` file
 
-## Expanding the ESLint configuration
+### Clear Diagram
+- Remove all tables from the current diagram with a single action
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### AI Assistant (Groq)
+- Right-side chat panel powered by the Groq API (LLaMA 3.3 70B)
+- AI is aware of the current schema context (table names, columns, keys)
+- Provides recommendations for new table structures and SQL code
+- Inline SQL code blocks with a confirm button to apply suggested SQL directly into the diagram
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Technology Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+| Layer | Technology |
+|---|---|
+| Framework | React 19, TypeScript |
+| Build Tool | Vite |
+| Styling | Tailwind CSS v4 |
+| Diagram | @xyflow/react (React Flow) |
+| AI | Groq SDK (LLaMA 3.3 70B) |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18 or higher
+- A Groq API key — obtain one at [console.groq.com](https://console.groq.com)
+
+### Installation
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Configuration
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Copy the example environment file and fill in your Groq API key:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
+
+Edit `.env`:
+
+```
+VITE_GROQ_API_KEY=your_groq_api_key_here
+```
+
+### Development Server
+
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`.
+
+### Production Build
+
+```bash
+npm run build
+```
+
+## Project Structure
+
+```
+src/
+  components/        # UI components (Sidebar, AppHeader, modals, diagram node)
+  utils/             # SQL parser, SQL exporter, Groq client
+  types/             # TypeScript interfaces for schema and theme
+  data/              # Default sample schema
+```
+
+## Notes
+
+- The Groq API key is loaded from the `VITE_GROQ_API_KEY` environment variable. Do not commit the `.env` file to version control.
+- The AI assistant sends the full schema context (table names and column definitions) as part of every request to Groq.

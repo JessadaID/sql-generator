@@ -5,7 +5,9 @@ interface AppHeaderProps {
     theme: Theme;
     bgType: BackgroundType;
     isSidebarOpen: boolean;
+    isAiOpen: boolean;
     onToggleSidebar: () => void;
+    onToggleAi: () => void;
     onSetTheme: (t: Theme) => void;
     onSetBgType: (b: BackgroundType) => void;
 }
@@ -56,7 +58,9 @@ const LEGEND_STYLES = {
 export default function AppHeader({
     theme,
     bgType,
+    isAiOpen,
     onToggleSidebar,
+    onToggleAi,
     onSetTheme,
     onSetBgType,
 }: AppHeaderProps) {
@@ -72,8 +76,8 @@ export default function AppHeader({
                 <button
                     onClick={onToggleSidebar}
                     className={`p-1.5 -ml-2 rounded-lg transition-colors ${theme === 'dark'
-                            ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
-                            : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+                        ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                        : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
                         }`}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,6 +140,26 @@ export default function AppHeader({
                     </button>
                 ))}
             </div>
+
+            {/* Divider */}
+            <div className={`h-6 w-px mx-2 ${DIVIDER[theme]}`} />
+
+            {/* AI Assistant toggle button */}
+            <button
+                onClick={onToggleAi}
+                title={isAiOpen ? 'ปิด AI Assistant' : 'เปิด AI Assistant'}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isAiOpen
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                        : theme === 'dark'
+                            ? 'bg-slate-800 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300'
+                            : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'
+                    }`}
+            >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z" />
+                </svg>
+                AI
+            </button>
         </header>
     );
 }
