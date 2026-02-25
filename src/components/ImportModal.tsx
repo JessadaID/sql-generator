@@ -85,7 +85,10 @@ export default function ImportModal({ isOpen, onClose, onImport, theme }: Import
             <div className={`w-full max-w-3xl border shadow-2xl rounded-2xl overflow-hidden flex flex-col ${s.modal}`}>
                 {/* Header */}
                 <div className={`flex items-center justify-between px-6 py-4 border-b ${s.divider}`}>
-                    <h2 className="text-lg font-bold tracking-tight">Import SQL</h2>
+                    <div>
+                        <h2 className="text-lg font-bold tracking-tight">Import SQL</h2>
+                        <p className="text-xs opacity-50 mt-0.5">รองรับ CREATE TABLE และ ALTER TABLE</p>
+                    </div>
                     <button
                         onClick={onClose}
                         className="p-1.5 rounded-md opacity-60 hover:opacity-100 hover:bg-slate-500/10 transition-colors"
@@ -146,7 +149,7 @@ export default function ImportModal({ isOpen, onClose, onImport, theme }: Import
                     {/* SQL textarea */}
                     <textarea
                         className={`w-full h-72 p-4 font-mono text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none ${s.textarea}`}
-                        placeholder="Paste your CREATE TABLE statements here..."
+                        placeholder={`-- CREATE TABLE (เพิ่มตารางใหม่)\nCREATE TABLE users (\n  id INT PRIMARY KEY,\n  name VARCHAR(100)\n);\n\n-- หรือ ALTER TABLE (แก้ไขตารางที่มีอยู่)\nALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL;\nALTER TABLE users DROP COLUMN address;`}
                         value={sql}
                         onChange={(e) => setSql(e.target.value)}
                     />

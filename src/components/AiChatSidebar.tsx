@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { chatWithGroq, type ChatMessage } from '../utils/groqClient';
+import { applyAlterStatements } from '../utils/sqlParser';
 import type { SqlSchema } from '../types/schema';
 import type { Theme } from '../types/theme';
 
@@ -9,21 +10,30 @@ interface AiChatSidebarProps {
     theme: Theme;
     onClose: () => void;
     onImportSql: (sql: string) => void;
+    onApplyAlter: (newSchema: SqlSchema) => void;
+}
+
+// Detect if an SQL snippet contains ALTER TABLE statements
+function hasAlterTable(sql: string): boolean {
+    return /^\s*ALTER\s+TABLE/im.test(sql);
 }
 
 // Render message content with syntax-highlighted SQL blocks
 function MessageContent({
     content,
     onImportSql,
+    onApplyAlter,
     theme,
 }: {
     content: string;
     onImportSql: (sql: string) => void;
+    onApplyAlter: (sql: string) => void;
     theme: Theme;
 }) {
     const codeBg = theme === 'dark' ? 'bg-slate-950 border-slate-700' : 'bg-slate-100 border-slate-300';
     const codeText = theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700';
     const btnBg = 'bg-indigo-600 hover:bg-indigo-500 text-white';
+    const alterBtnBg = 'bg-amber-600 hover:bg-amber-500 text-white';
 
     // Split content into text parts and SQL code blocks
     const parts = content.split(/(```sql[\s\S]*?```)/gi);
@@ -34,27 +44,43 @@ function MessageContent({
                 const sqlMatch = part.match(/```sql\s*([\s\S]*?)```/i);
                 if (sqlMatch) {
                     const sql = sqlMatch[1].trim();
+                    const isAlter = hasAlterTable(sql);
                     return (
                         <div key={i} className={`rounded-lg border overflow-hidden ${codeBg}`}>
                             {/* SQL header label */}
                             <div className="px-3 py-1.5 flex items-center justify-between border-b border-inherit">
-                                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">SQL</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+                                    {isAlter ? 'ALTER TABLE' : 'SQL'}
+                                </span>
                             </div>
                             {/* SQL code display */}
                             <pre className={`p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words ${codeText}`}>
                                 {sql}
                             </pre>
-                            {/* Confirm button to import SQL into diagram */}
+                            {/* Action button */}
                             <div className="px-3 py-2 border-t border-inherit flex justify-end">
-                                <button
-                                    onClick={() => onImportSql(sql)}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${btnBg}`}
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    ใช้ SQL นี้
-                                </button>
+                                {isAlter ? (
+                                    <button
+                                        onClick={() => onApplyAlter(sql)}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${alterBtnBg}`}
+                                    >
+                                        {/* Pencil icon */}
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Apply ALTER
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => onImportSql(sql)}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${btnBg}`}
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        ใช้ SQL นี้
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );
@@ -70,7 +96,7 @@ function MessageContent({
     );
 }
 
-export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImportSql }: AiChatSidebarProps) {
+export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImportSql, onApplyAlter }: AiChatSidebarProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -110,6 +136,24 @@ export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImport
             ]);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // Handle ALTER TABLE SQL from AI — apply directly to current schema
+    const handleAiAlterSql = (sql: string) => {
+        try {
+            const newSchema = applyAlterStatements(schema, sql);
+            onApplyAlter(newSchema);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: '✅ Apply ALTER TABLE สำเร็จ! Diagram อัปเดตแล้ว' },
+            ]);
+        } catch (err) {
+            console.error('Apply ALTER error:', err);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: '❌ ไม่สามารถ apply ALTER TABLE ได้ ตรวจสอบ syntax' },
+            ]);
         }
     };
 
@@ -233,7 +277,7 @@ export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImport
                             {/* Message bubble */}
                             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${msg.role === 'user' ? `${userBubble} rounded-tr-sm` : `${aiBubble} rounded-tl-sm`}`}>
                                 {msg.role === 'assistant' ? (
-                                    <MessageContent content={msg.content} onImportSql={onImportSql} theme={theme} />
+                                    <MessageContent content={msg.content} onImportSql={onImportSql} onApplyAlter={handleAiAlterSql} theme={theme} />
                                 ) : (
                                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                                 )}

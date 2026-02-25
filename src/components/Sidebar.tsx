@@ -47,6 +47,7 @@ export default function Sidebar({ isOpen, theme, onImportClick, onExportClick, o
                         Export SQL Code
                     </button>
 
+
                     {/* Divider */}
                     <div className={`my-1 h-px ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`} />
 
