@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
     ReactFlow,
     Background,
@@ -7,6 +7,7 @@ import {
     addEdge,
     useNodesState,
     useEdgesState,
+    useReactFlow,
     BackgroundVariant,
     MarkerType,
 } from '@xyflow/react';
@@ -15,6 +16,7 @@ import TableNode from './TableNode';
 import type { TableNodeData } from './TableNode';
 import type { ForeignKey, SqlSchema, TableSchema } from '../types/schema';
 import type { Theme, BackgroundType } from '../types/theme';
+import { captureFullDiagram, type ExportFormat } from '../utils/imageExporter';
 
 const nodeTypes = { tableNode: TableNode };
 
@@ -61,6 +63,10 @@ const MINIMAP_MASK: Record<Theme, string> = {
     light: 'rgba(255,255,255, 0.6)',
 };
 
+export interface SqlDiagramHandle {
+    captureImage(format: ExportFormat, backgroundColor?: string): Promise<void>;
+}
+
 interface SqlDiagramProps {
     schema: SqlSchema;
     theme?: Theme;
@@ -68,107 +74,126 @@ interface SqlDiagramProps {
     onTableDelete?: (deletedTableIds: Set<string>) => void;
 }
 
-const SqlDiagram = ({ schema, theme = 'dark', bgType = 'dots', onTableDelete }: SqlDiagramProps) => {
-    const edgeColor = EDGE_COLOR[theme];
+// Inner component inside ReactFlow context — needed to call useReactFlow()
+const DiagramCaptureHandle = forwardRef<SqlDiagramHandle>((_, ref) => {
+    const { getNodes } = useReactFlow();
 
-    // Build initial edges (memoized — rebuilds when schema or theme changes)
-    const edgesFromSchema: Edge[] = useMemo(
-        () => schema.foreignKeys.map((fk, idx) => buildEdge(fk, idx, edgeColor, theme)),
-        [schema.foreignKeys, theme, edgeColor]
-    );
+    useImperativeHandle(ref, () => ({
+        async captureImage(format, backgroundColor) {
+            const nodes = getNodes();
+            await captureFullDiagram(nodes, format, backgroundColor);
+        },
+    }));
 
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState(edgesFromSchema);
+    return null;
+});
 
-    // Sync nodes: preserve user-dragged positions for existing nodes; append new ones
-    useEffect(() => {
-        setNodes((prev) => {
-            const existingMap = new Map(prev.map((n) => [n.id, n]));
-            const newTables = schema.tables.filter((t) => !existingMap.has(t.id));
+const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
+    ({ schema, theme = 'dark', bgType = 'dots', onTableDelete }, ref) => {
+        const edgeColor = EDGE_COLOR[theme];
 
-            return schema.tables.map((table) => {
-                const existing = existingMap.get(table.id);
-                if (existing) {
-                    // Refresh data/theme without moving the node
-                    return { ...existing, data: { schema: table, theme } as TableNodeData };
-                }
-                // New node — place after current nodes
-                const newIdx = prev.length + newTables.indexOf(table);
-                return buildNode(table, newIdx, theme);
+        // Build initial edges (memoized — rebuilds when schema or theme changes)
+        const edgesFromSchema: Edge[] = useMemo(
+            () => schema.foreignKeys.map((fk, idx) => buildEdge(fk, idx, edgeColor, theme)),
+            [schema.foreignKeys, theme, edgeColor]
+        );
+
+        const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+        const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(edgesFromSchema);
+
+        // Sync nodes: preserve user-dragged positions for existing nodes; append new ones
+        useEffect(() => {
+            setNodes((prev) => {
+                const existingMap = new Map(prev.map((n) => [n.id, n]));
+                const newTables = schema.tables.filter((t) => !existingMap.has(t.id));
+
+                return schema.tables.map((table) => {
+                    const existing = existingMap.get(table.id);
+                    if (existing) {
+                        // Refresh data/theme without moving the node
+                        return { ...existing, data: { schema: table, theme } as TableNodeData };
+                    }
+                    // New node — place after current nodes
+                    const newIdx = prev.length + newTables.indexOf(table);
+                    return buildNode(table, newIdx, theme);
+                });
             });
-        });
-    }, [schema.tables, theme, setNodes]);
+        }, [schema.tables, theme, setNodes]);
 
-    // Sync edges whenever schema or theme changes
-    useEffect(() => {
-        setEdges(edgesFromSchema);
-    }, [edgesFromSchema, setEdges]);
+        // Sync edges whenever schema or theme changes
+        useEffect(() => {
+            setEdges(edgesFromSchema);
+        }, [edgesFromSchema, setEdges]);
 
-    const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
-    );
+        const onConnect = useCallback(
+            (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+            [setEdges]
+        );
 
-    const handleNodesDelete = useCallback(
-        (deletedNodes: Node[]) => {
-            if (onTableDelete && deletedNodes.length > 0) {
-                onTableDelete(new Set(deletedNodes.map((n) => n.id)));
-            }
-        },
-        [onTableDelete]
-    );
+        const handleNodesDelete = useCallback(
+            (deletedNodes: Node[]) => {
+                if (onTableDelete && deletedNodes.length > 0) {
+                    onTableDelete(new Set(deletedNodes.map((n) => n.id)));
+                }
+            },
+            [onTableDelete]
+        );
 
-    const minimapNodeColor = useCallback(
-        (node: Node) => {
-            const d = node.data as TableNodeData;
-            const hasPk = d?.schema?.columns?.some((c) => c.isPrimaryKey);
-            return theme === 'dark'
-                ? hasPk ? '#6366f1' : '#334155'
-                : hasPk ? '#4f46e5' : '#e2e8f0';
-        },
-        [theme]
-    );
+        const minimapNodeColor = useCallback(
+            (node: Node) => {
+                const d = node.data as TableNodeData;
+                const hasPk = d?.schema?.columns?.some((c) => c.isPrimaryKey);
+                return theme === 'dark'
+                    ? hasPk ? '#6366f1' : '#334155'
+                    : hasPk ? '#4f46e5' : '#e2e8f0';
+            },
+            [theme]
+        );
 
-    return (
-        <div className="w-full h-full pb-4">
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onNodesDelete={handleNodesDelete}
-                nodeTypes={nodeTypes}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                minZoom={0.2}
-                maxZoom={1.5}
-                defaultEdgeOptions={{ type: 'smoothstep' }}
-            >
-                <Background
-                    variant={bgType === 'dots' ? BackgroundVariant.Dots : BackgroundVariant.Lines}
-                    gap={40}
-                    size={bgType === 'dots' ? 2.5 : 1}
-                    color={BG_COLOR[theme]}
-                />
+        return (
+            <div className="w-full h-full pb-4">
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onNodesDelete={handleNodesDelete}
+                    nodeTypes={nodeTypes}
+                    fitView
+                    fitViewOptions={{ padding: 0.2 }}
+                    minZoom={0.2}
+                    maxZoom={1.5}
+                    defaultEdgeOptions={{ type: 'smoothstep' }}
+                >
+                    {/* Inner component must be inside ReactFlow to access useReactFlow() */}
+                    <DiagramCaptureHandle ref={ref} />
 
-                <Controls
-                    className="!rounded-xl !shadow-xl !bg-white !border-slate-200 !text-slate-700 [&_path]:!fill-slate-700"
-                    style={{ bottom: 24, left: 24 }}
-                />
+                    <Background
+                        variant={bgType === 'dots' ? BackgroundVariant.Dots : BackgroundVariant.Lines}
+                        gap={40}
+                        size={bgType === 'dots' ? 2.5 : 1}
+                        color={BG_COLOR[theme]}
+                    />
 
-                <MiniMap
-                    nodeColor={minimapNodeColor}
-                    maskColor={MINIMAP_MASK[theme]}
-                    className={`!border !rounded-xl !overflow-hidden ${theme === 'dark'
+                    <Controls
+                        className="!rounded-xl !shadow-xl !bg-white !border-slate-200 !text-slate-700 [&_path]:!fill-slate-700"
+                        style={{ bottom: 24, left: 24 }}
+                    />
+
+                    <MiniMap
+                        nodeColor={minimapNodeColor}
+                        maskColor={MINIMAP_MASK[theme]}
+                        className={`!border !rounded-xl !overflow-hidden ${theme === 'dark'
                             ? '!bg-slate-900 !border-slate-800'
                             : '!bg-slate-50 !border-slate-200'
-                        }`}
-                    style={{ bottom: 24, right: 24 }}
-                />
-            </ReactFlow>
-        </div>
-    );
-};
+                            }`}
+                        style={{ bottom: 24, right: 24 }}
+                    />
+                </ReactFlow>
+            </div>
+        );
+    }
+);
 
 export default SqlDiagram;
