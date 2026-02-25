@@ -153,6 +153,78 @@ export function generateAlterSql(oldSchema: SqlSchema, newSchema: SqlSchema): st
         : result;
 }
 
+// Generate DBML (Database Markup Language) from schema
+export function generateDBML(schema: SqlSchema): string {
+    if (schema.tables.length === 0) return '// No tables defined';
+
+    const lines: string[] = [];
+    lines.push('// DBML Export from SQL Diagram');
+    lines.push(`// Generated: ${new Date().toISOString()}`);
+    lines.push('');
+
+    schema.tables.forEach((table, idx) => {
+        lines.push(`Table ${table.name} {`);
+
+        table.columns.forEach((col) => {
+            const settings: string[] = [];
+            if (col.isPrimaryKey) settings.push('primary key');
+            if (col.unique && !col.isPrimaryKey) settings.push('unique');
+            if (!col.nullable) settings.push('not null');
+
+            const settingStr = settings.length > 0 ? ` [${settings.join(', ')}]` : '';
+            lines.push(`  ${col.name} ${col.type}${settingStr}`);
+        });
+
+        lines.push('}');
+        if (idx < schema.tables.length - 1) lines.push('');
+    });
+
+    if (schema.foreignKeys.length > 0) {
+        lines.push('');
+        lines.push('// Relationships');
+    }
+
+    schema.foreignKeys.forEach((fk) => {
+        // Assumption: Typically FK signifies Many-to-One
+        lines.push(`Ref: ${fk.fromTable}.${fk.fromColumn} > ${fk.toTable}.${fk.toColumn}`);
+    });
+
+    return lines.join('\n');
+}
+
+// Generate Mermaid.js erDiagram from schema
+export function generateMermaidER(schema: SqlSchema): string {
+    if (schema.tables.length === 0) return '%% No tables defined\nerDiagram';
+
+    const lines: string[] = [];
+    lines.push('erDiagram');
+
+    schema.tables.forEach((table) => {
+        lines.push(`    ${table.name} {`);
+
+        table.columns.forEach((col) => {
+            const keyStr = col.isPrimaryKey ? ' PK' : col.isForeignKey ? ' FK' : '';
+            // Mermaid types shouldn't contain spaces to avoid syntax errors, replace spaces with underscores
+            const safeType = col.type.replace(/\s+/g, '_');
+            lines.push(`        ${safeType} ${col.name}${keyStr}`);
+        });
+
+        lines.push(`    }`);
+    });
+
+    if (schema.foreignKeys.length > 0) {
+        lines.push('');
+    }
+
+    schema.foreignKeys.forEach((fk) => {
+        // Mermaid format: A ||--o{ B : "comments"
+        // Target (One) ||--o{ Source (Many)
+        lines.push(`    ${fk.toTable} ||--o{ ${fk.fromTable} : "fk_${fk.fromColumn}"`);
+    });
+
+    return lines.join('\n');
+}
+
 // Trigger browser download of the generated SQL as a .sql file
 export function downloadSqlFile(schema: SqlSchema, filename = 'schema.sql'): void {
     const sql = generateSql(schema);

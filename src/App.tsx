@@ -6,7 +6,7 @@ import ImportModal from './components/ImportModal';
 import ExportModal from './components/ExportModal';
 import AppHeader from './components/AppHeader';
 import { sampleSchema } from './data/sampleSchema';
-import type { Theme, BackgroundType } from './types/theme';
+import type { Theme, BackgroundType, ViewMode } from './types/theme';
 import type { ForeignKey, SqlSchema } from './types/schema';
 import type { ExportFormat } from './utils/imageExporter';
 import { parseSqlToSchema, applyAlterStatements } from './utils/sqlParser';
@@ -34,6 +34,7 @@ const APP_STYLES: Record<Theme, string> = {
 function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [bgType, setBgType] = useState<BackgroundType>('dots');
+  const [viewMode, setViewMode] = useState<ViewMode>('sql');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -134,12 +135,14 @@ function App() {
       <AppHeader
         theme={theme}
         bgType={bgType}
+        viewMode={viewMode}
         isSidebarOpen={isSidebarOpen}
         isAiOpen={isAiSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
         onToggleAi={() => setIsAiSidebarOpen((open) => !open)}
         onSetTheme={setTheme}
         onSetBgType={setBgType}
+        onSetViewMode={setViewMode}
       />
 
       {/* Main Content Area */}
@@ -148,7 +151,7 @@ function App() {
 
         {/* Diagram canvas */}
         <main className="flex-1 h-full overflow-hidden">
-          <SqlDiagram ref={diagramRef} schema={schema} theme={theme} bgType={bgType} onTableDelete={handleTableDelete} />
+          <SqlDiagram ref={diagramRef} schema={schema} theme={theme} bgType={bgType} viewMode={viewMode} onTableDelete={handleTableDelete} />
         </main>
 
         {/* AI Chat Sidebar (right) */}

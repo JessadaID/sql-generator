@@ -1,15 +1,17 @@
-import type { Theme, BackgroundType } from '../types/theme';
+import type { Theme, BackgroundType, ViewMode } from '../types/theme';
 import { BTN_ACTIVE, BTN_BASE, BTN_INACTIVE, DIVIDER, TEXT_HEADING } from '../constants/themeStyles';
 
 interface AppHeaderProps {
     theme: Theme;
     bgType: BackgroundType;
+    viewMode: ViewMode;
     isSidebarOpen: boolean;
     isAiOpen: boolean;
     onToggleSidebar: () => void;
     onToggleAi: () => void;
     onSetTheme: (t: Theme) => void;
     onSetBgType: (b: BackgroundType) => void;
+    onSetViewMode: (v: ViewMode) => void;
 }
 
 // Legend item with colored dot
@@ -58,11 +60,13 @@ const LEGEND_STYLES = {
 export default function AppHeader({
     theme,
     bgType,
+    viewMode,
     isAiOpen,
     onToggleSidebar,
     onToggleAi,
     onSetTheme,
     onSetBgType,
+    onSetViewMode,
 }: AppHeaderProps) {
     const btnClass = (active: boolean) =>
         `${BTN_BASE} ${active ? BTN_ACTIVE[theme] : BTN_INACTIVE[theme]}`;
@@ -103,21 +107,51 @@ export default function AppHeader({
 
             {/* Legend */}
             <div className="flex items-center gap-5 text-xs font-medium">
-                <LegendItem dotClass={LEGEND_STYLES.pkDot[theme]} textClass={LEGEND_STYLES.pk[theme]}>
-                    Primary Key
-                </LegendItem>
-                <LegendItem dotClass={LEGEND_STYLES.fkDot[theme]} textClass={LEGEND_STYLES.fk[theme]}>
-                    Foreign Key
-                </LegendItem>
-                <LegendItem dotClass={LEGEND_STYLES.nnDot[theme]} textClass={LEGEND_STYLES.nn[theme]}>
-                    NN = Not Null
-                    <span className={LEGEND_STYLES.desc[theme]}>
-                        <span className="mx-1 opacity-50">·</span> UQ = Unique
-                    </span>
-                </LegendItem>
+                {viewMode === 'er' ? (
+                    <>
+                        <div className={`flex items-center gap-1.5 ${LEGEND_STYLES.desc[theme]}`}>
+                            <span className="font-bold opacity-80">||</span> One
+                        </div>
+                        <div className={`flex items-center gap-1.5 ${LEGEND_STYLES.desc[theme]}`}>
+                            <span className="font-bold opacity-80">{'<|'}</span> Many
+                        </div>
+                        <div className={`flex items-center gap-1.5 ${LEGEND_STYLES.desc[theme]}`}>
+                            <span className={`w-3 h-0.5 rounded-full ${theme === 'dark' ? 'bg-[#818cf8]' : 'bg-[#6366f1]'}`}></span> Relationship
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <LegendItem dotClass={LEGEND_STYLES.pkDot[theme]} textClass={LEGEND_STYLES.pk[theme]}>
+                            Primary Key
+                        </LegendItem>
+                        <LegendItem dotClass={LEGEND_STYLES.fkDot[theme]} textClass={LEGEND_STYLES.fk[theme]}>
+                            Foreign Key
+                        </LegendItem>
+                        <LegendItem dotClass={LEGEND_STYLES.nnDot[theme]} textClass={LEGEND_STYLES.nn[theme]}>
+                            NN = Not Null
+                            <span className={LEGEND_STYLES.desc[theme]}>
+                                <span className="mx-1 opacity-50">·</span> UQ = Unique
+                            </span>
+                        </LegendItem>
+                    </>
+                )}
             </div>
 
             <div className="flex-1" />
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-1.5">
+                <SwitcherLabel theme={theme}>View</SwitcherLabel>
+                <button onClick={() => onSetViewMode('sql')} className={`${btnClass(viewMode === 'sql' || !viewMode)}`}>
+                    SQL
+                </button>
+                <button onClick={() => onSetViewMode('er')} className={`${btnClass(viewMode === 'er')}`}>
+                    ER
+                </button>
+            </div>
+
+            {/* Divider */}
+            <div className={`h-6 w-px mx-2 ${DIVIDER[theme]}`} />
 
             {/* Background Pattern Switcher */}
             <div className="flex items-center gap-1.5">

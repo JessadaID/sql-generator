@@ -1,11 +1,12 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { TableSchema, ColumnDef } from '../types/schema';
-import type { Theme } from '../types/theme';
+import type { Theme, ViewMode } from '../types/theme';
 
 export interface TableNodeData extends Record<string, unknown> {
     schema: TableSchema;
     theme?: Theme;
+    viewMode?: ViewMode;
     onDelete?: (tableId: string) => void;
 }
 
@@ -162,12 +163,16 @@ const TableNode = ({ data, isConnectable }: TableNodeProps) => {
 
                             {col.isPrimaryKey && <Badge label="PK" colorClass={s.badgePk} />}
                             {col.isForeignKey && <Badge label="FK" colorClass={s.badgeFk} />}
-                            {col.nullable === false && <Badge label="NN" colorClass={s.badgeNn} />}
-                            {col.unique && <Badge label="UQ" colorClass={s.badgeUq} />}
+
+                            {/* Hide secondary badges in ER mode for cleaner look */}
+                            {data.viewMode !== 'er' && col.nullable === false && <Badge label="NN" colorClass={s.badgeNn} />}
+                            {data.viewMode !== 'er' && col.unique && <Badge label="UQ" colorClass={s.badgeUq} />}
                         </div>
 
-                        {/* Data type */}
-                        <TypeBadge type={col.type} fontColorClass={s.typeColor} />
+                        {/* Data type - hide in ER mode */}
+                        {data.viewMode !== 'er' && (
+                            <TypeBadge type={col.type} fontColorClass={s.typeColor} />
+                        )}
                     </div>
                 ))}
             </div>
