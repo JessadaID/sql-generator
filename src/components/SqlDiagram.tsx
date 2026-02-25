@@ -13,12 +13,14 @@ import {
 } from '@xyflow/react';
 import type { Connection, Edge, Node } from '@xyflow/react';
 import TableNode from './TableNode';
+import ErEdge from './edges/ErEdge';
 import type { TableNodeData } from './TableNode';
 import type { ForeignKey, SqlSchema, TableSchema } from '../types/schema';
-import type { Theme, BackgroundType } from '../types/theme';
+import type { Theme, BackgroundType, ViewMode } from '../types/theme';
 import { captureFullDiagram, type ExportFormat } from '../utils/imageExporter';
 
 const nodeTypes = { tableNode: TableNode };
+const edgeTypes = { erEdge: ErEdge };
 
 const COLUMN_GAP = 360;
 const ROW_GAP = 320;
@@ -35,30 +37,32 @@ const buildNode = (
     table: TableSchema,
     idx: number,
     theme: Theme,
+    viewMode: ViewMode,
     onDelete?: (tableId: string) => void
 ): Node => ({
     id: table.id,
     type: 'tableNode' as const,
     position: gridPosition(idx),
-    data: { schema: table, theme, onDelete } as TableNodeData,
+    data: { schema: table, theme, viewMode, onDelete } as TableNodeData,
 });
 
 // Build a ReactFlow edge from a foreign key definition
-const buildEdge = (fk: ForeignKey, idx: number, edgeColor: string, theme: Theme): Edge => ({
+const buildEdge = (fk: ForeignKey, idx: number, edgeColor: string, theme: Theme, viewMode: ViewMode): Edge => ({
     id: `fk-${idx}`,
     source: fk.fromTable,
     target: fk.toTable,
     sourceHandle: `${fk.fromTable}-${fk.fromColumn}-source`,
     targetHandle: `${fk.toTable}-${fk.toColumn}-target`,
-    type: 'smoothstep',
-    animated: true,
+    type: viewMode === 'er' ? 'erEdge' : 'smoothstep',
+    animated: viewMode !== 'er',
     style: { stroke: edgeColor, strokeWidth: 2, opacity: 0.8 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 16, height: 16 },
+    markerEnd: viewMode === 'er' ? undefined : { type: MarkerType.ArrowClosed, color: edgeColor, width: 16, height: 16 },
     label: `${fk.fromColumn} → ${fk.toColumn}`,
-    labelStyle: { fill: theme === 'dark' ? '#94a3b8' : '#64748b', fontSize: 11, fontWeight: 500 },
-    labelBgStyle: { fill: theme === 'dark' ? '#1e293b' : '#f1f5f9', fillOpacity: 0.9 },
-    labelBgPadding: [6, 4] as [number, number],
-    labelBgBorderRadius: 6,
+    data: viewMode === 'er' ? { label: `${fk.fromColumn} → ${fk.toColumn}`, theme } : undefined,
+    labelStyle: viewMode === 'er' ? undefined : { fill: theme === 'dark' ? '#94a3b8' : '#64748b', fontSize: 11, fontWeight: 500 },
+    labelBgStyle: viewMode === 'er' ? undefined : { fill: theme === 'dark' ? '#1e293b' : '#f1f5f9', fillOpacity: 0.9 },
+    labelBgPadding: viewMode === 'er' ? undefined : ([6, 4] as [number, number]),
+    labelBgBorderRadius: viewMode === 'er' ? undefined : 6,
 });
 
 const BG_COLOR: Record<Theme, string> = { dark: '#334155', light: '#cbd5e1' };
@@ -76,6 +80,7 @@ interface SqlDiagramProps {
     schema: SqlSchema;
     theme?: Theme;
     bgType?: BackgroundType;
+    viewMode?: ViewMode;
     onTableDelete?: (deletedTableIds: Set<string>) => void;
 }
 
@@ -94,13 +99,13 @@ const DiagramCaptureHandle = forwardRef<SqlDiagramHandle>((_, ref) => {
 });
 
 const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
-    ({ schema, theme = 'dark', bgType = 'dots', onTableDelete }, ref) => {
+    ({ schema, theme = 'dark', bgType = 'dots', viewMode = 'sql', onTableDelete }, ref) => {
         const edgeColor = EDGE_COLOR[theme];
 
         // Build initial edges (memoized — rebuilds when schema or theme changes)
         const edgesFromSchema: Edge[] = useMemo(
-            () => schema.foreignKeys.map((fk, idx) => buildEdge(fk, idx, edgeColor, theme)),
-            [schema.foreignKeys, theme, edgeColor]
+            () => schema.foreignKeys.map((fk, idx) => buildEdge(fk, idx, edgeColor, theme, viewMode)),
+            [schema.foreignKeys, theme, edgeColor, viewMode]
         );
 
         const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -130,15 +135,15 @@ const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
                 return schema.tables.map((table) => {
                     const existing = existingMap.get(table.id);
                     if (existing) {
-                        // Refresh data/theme/onDelete without moving the node
-                        return { ...existing, data: { schema: table, theme, onDelete: handleNodeDelete } as TableNodeData };
+                        // Refresh data/theme/viewMode/onDelete without moving the node
+                        return { ...existing, data: { schema: table, theme, viewMode, onDelete: handleNodeDelete } as TableNodeData };
                     }
                     // New node — place after current nodes
                     const newIdx = prev.length + newTables.indexOf(table);
-                    return buildNode(table, newIdx, theme, handleNodeDelete);
+                    return buildNode(table, newIdx, theme, viewMode, handleNodeDelete);
                 });
             });
-        }, [schema.tables, theme, setNodes, handleNodeDelete]);
+        }, [schema.tables, theme, viewMode, setNodes, handleNodeDelete]);
 
         // Sync edges whenever schema or theme changes
         useEffect(() => {
@@ -175,6 +180,7 @@ const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
                     onConnect={onConnect}
                     onNodesDelete={handleNodesDelete}
                     nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
                     fitView
                     fitViewOptions={{ padding: 0.2 }}
                     minZoom={0.2}

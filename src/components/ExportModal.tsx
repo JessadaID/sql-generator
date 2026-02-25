@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Theme } from '../types/theme';
 import type { SqlSchema } from '../types/schema';
-import { generateSql, downloadSqlFile } from '../utils/sqlExporter';
+import { generateSql, downloadSqlFile, generateDBML, generateMermaidER } from '../utils/sqlExporter';
 import { toast } from 'sonner';
 import type { ExportFormat } from '../utils/imageExporter';
 
@@ -35,8 +35,9 @@ const BG_PRESETS = [
     { label: 'Light Gray', value: '#f1f5f9' },
 ];
 
-type TabType = 'sql' | 'image';
+type TabType = 'sql' | 'image' | 'er';
 type ImageFormat = 'png' | 'jpg' | 'pdf';
+type ERFormat = 'mermaid' | 'dbml';
 
 // Default bg per format: PNG = transparent, others = dark
 const DEFAULT_BG: Record<ImageFormat, string> = {
@@ -48,12 +49,15 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('sql');
     const [selectedFormat, setSelectedFormat] = useState<ImageFormat>('png');
+    const [selectedERFormat, setSelectedERFormat] = useState<ERFormat>('mermaid');
     const [selectedBg, setSelectedBg] = useState(''); // empty = transparent (PNG only)
     const [isExporting, setIsExporting] = useState(false);
 
     if (!isOpen) return null;
 
     const sql = generateSql(schema);
+    const erCode = selectedERFormat === 'dbml' ? generateDBML(schema) : generateMermaidER(schema);
+
     const s = {
         overlay: MODAL_STYLES.overlay[theme],
         modal: MODAL_STYLES.modal[theme],
@@ -65,22 +69,22 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
     const tabActive = (t: TabType) =>
         activeTab === t ? MODAL_STYLES.tab.active[theme] : MODAL_STYLES.tab.inactive[theme];
 
-    const handleCopy = async () => {
+    const handleCopy = async (text: string, title = 'SQL') => {
         try {
-            await navigator.clipboard.writeText(sql);
+            await navigator.clipboard.writeText(text);
             setCopied(true);
-            toast.success('คัดลอก SQL เรียบร้อยแล้ว');
+            toast.success(`คัดลอก ${title} เรียบร้อยแล้ว`);
             setTimeout(() => setCopied(false), 2000);
         } catch {
             // Fallback copy via execCommand
             const el = document.createElement('textarea');
-            el.value = sql;
+            el.value = text;
             document.body.appendChild(el);
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
             setCopied(true);
-            toast.success('คัดลอก SQL เรียบร้อยแล้ว');
+            toast.success(`คัดลอก ${title} เรียบร้อยแล้ว`);
             setTimeout(() => setCopied(false), 2000);
         }
     };
@@ -135,6 +139,12 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
                         SQL Code
                     </button>
                     <button
+                        onClick={() => setActiveTab('er')}
+                        className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${tabActive('er')}`}
+                    >
+                        ER Diagram
+                    </button>
+                    <button
                         onClick={() => setActiveTab('image')}
                         className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${tabActive('image')}`}
                     >
@@ -149,7 +159,7 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
                             <div className="flex items-center justify-between shrink-0">
                                 <span className="text-xs font-mono opacity-50">schema.sql · {schema.tables.length} tables · {sql.split('\n').length} lines</span>
                                 <button
-                                    onClick={handleCopy}
+                                    onClick={() => handleCopy(sql, 'SQL')}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${s.copyBtn}`}
                                 >
                                     {copied ? (
@@ -188,6 +198,66 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
                                 Download .sql
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* ER Diagram Tab */}
+                {activeTab === 'er' && (
+                    <>
+                        <div className="flex-1 overflow-hidden flex flex-col p-6 gap-3 min-h-0">
+                            {/* Format Selector */}
+                            <div className="flex gap-2">
+                                {(['mermaid', 'dbml'] as ERFormat[]).map((fmt) => (
+                                    <button
+                                        key={fmt}
+                                        onClick={() => setSelectedERFormat(fmt)}
+                                        className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all ${selectedERFormat === fmt
+                                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-500'
+                                            : theme === 'dark' ? 'border-slate-700 text-slate-400 hover:border-slate-500' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                            }`}
+                                    >
+                                        {fmt === 'mermaid' ? 'Mermaid.js' : 'DBML'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center justify-between shrink-0">
+                                <span className="text-xs font-mono opacity-50">
+                                    {selectedERFormat === 'mermaid' ? 'erDiagram' : 'DBML'} · {schema.tables.length} tables · {erCode.split('\n').length} lines
+                                </span>
+                                <button
+                                    onClick={() => handleCopy(erCode, selectedERFormat === 'mermaid' ? 'Mermaid' : 'DBML')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${s.copyBtn}`}
+                                >
+                                    {copied ? (
+                                        <>
+                                            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Copied!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            Copy
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <div className={`flex-1 overflow-auto rounded-xl border ${s.code}`}>
+                                <pre className="p-5 text-xs font-mono leading-relaxed whitespace-pre min-w-max">{erCode}</pre>
+                            </div>
+                        </div>
+                        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t bg-black/5 shrink-0 ${s.divider}`}>
+                            <button
+                                onClick={onClose}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                            >
+                                Close
                             </button>
                         </div>
                     </>
