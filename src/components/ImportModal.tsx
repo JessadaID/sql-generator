@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { Theme } from '../types/theme';
 
 interface ImportModalProps {
@@ -32,7 +33,6 @@ const MODAL_STYLES = {
 export default function ImportModal({ isOpen, onClose, onImport, theme }: ImportModalProps) {
     const [sql, setSql] = useState('');
     const [fileName, setFileName] = useState<string | null>(null);
-    const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -44,12 +44,11 @@ export default function ImportModal({ isOpen, onClose, onImport, theme }: Import
 
         // Validate file extension
         if (!file.name.toLowerCase().endsWith('.sql')) {
-            setFileError('Please select a valid .sql file.');
+            toast.error('กรุณาเลือกไฟล์ .sql ที่ถูกต้อง');
             setFileName(null);
             return;
         }
 
-        setFileError(null);
         setFileName(file.name);
 
         const reader = new FileReader();
@@ -130,11 +129,6 @@ export default function ImportModal({ isOpen, onClose, onImport, theme }: Import
                                 {fileName}
                             </span>
                         )}
-
-                        {/* File error */}
-                        {fileError && (
-                            <span className="text-xs text-rose-400 font-medium">{fileError}</span>
-                        )}
                     </div>
 
                     {/* Divider with "or" label */}
@@ -172,6 +166,6 @@ export default function ImportModal({ isOpen, onClose, onImport, theme }: Import
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
