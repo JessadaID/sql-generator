@@ -46,11 +46,18 @@ function App() {
 
   const handleImportSql = (sql: string) => {
     try {
-      // Detect if SQL contains ALTER TABLE statements
+      // Detect SQL statement types
       const hasAlter = /^\s*ALTER\s+TABLE/im.test(sql);
       const hasCreate = /^\s*CREATE\s+TABLE/im.test(sql);
+      const hasDrop = /^\s*DROP\s+TABLE/im.test(sql);
 
-      if (hasAlter && !hasCreate) {
+      if (hasDrop && !hasCreate && !hasAlter) {
+        // Pure DROP TABLE — extract table names and remove from schema
+        const dropMatches = [...sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_`"'.]+)/gi)];
+        const dropIds = new Set(dropMatches.map((m) => m[1].replace(/[`"']/g, '').split('.').pop() ?? ''));
+        if (dropIds.size > 0) handleTableDelete(dropIds);
+        setIsModalOpen(false);
+      } else if (hasAlter && !hasCreate) {
         // Pure ALTER TABLE — apply to existing schema
         const newSchema = applyAlterStatements(schema, sql);
         setSchema(newSchema);
@@ -79,10 +86,23 @@ function App() {
   };
 
   const handleTableDelete = (deletedIds: Set<string>) => {
+    // 1. Check for foreign key constraints before deleting
+    for (const fk of schema.foreignKeys) {
+      // If the target table is being deleted, BUT the source table is NOT being deleted
+      // -> This violates the constraint, just like in a real database.
+      if (deletedIds.has(fk.toTable) && !deletedIds.has(fk.fromTable)) {
+        alert(
+          `Cannot drop table '${fk.toTable}' referenced by a foreign key constraint from table '${fk.fromTable}'.\n\nYou must drop the foreign key or table '${fk.fromTable}' first.`
+        );
+        return; // Block the deletion entirely
+      }
+    }
+
+    // 2. Safe to delete
     setSchema((prev) => ({
       // Remove deleted tables from schema
       tables: prev.tables.filter((t) => !deletedIds.has(t.id)),
-      // Remove foreign keys that reference deleted tables
+      // Remove foreign keys that reference or are sourced from deleted tables
       foreignKeys: prev.foreignKeys.filter(
         (fk) => !deletedIds.has(fk.fromTable) && !deletedIds.has(fk.toTable)
       ),
@@ -130,6 +150,7 @@ function App() {
           onClose={() => setIsAiSidebarOpen(false)}
           onImportSql={handleImportSql}
           onApplyAlter={handleApplyAlter}
+          onDropTable={handleTableDelete}
         />
       </div>
 

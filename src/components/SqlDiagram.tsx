@@ -31,11 +31,16 @@ const gridPosition = (idx: number) => ({
 });
 
 // Build a ReactFlow node from a table schema
-const buildNode = (table: TableSchema, idx: number, theme: Theme): Node => ({
+const buildNode = (
+    table: TableSchema,
+    idx: number,
+    theme: Theme,
+    onDelete?: (tableId: string) => void
+): Node => ({
     id: table.id,
     type: 'tableNode' as const,
     position: gridPosition(idx),
-    data: { schema: table, theme } as TableNodeData,
+    data: { schema: table, theme, onDelete } as TableNodeData,
 });
 
 // Build a ReactFlow edge from a foreign key definition
@@ -101,6 +106,21 @@ const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
         const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
         const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(edgesFromSchema);
 
+        const onConnect = useCallback(
+            (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+            [setEdges]
+        );
+
+        // Delete a single table by ID (called from TableNode delete button)
+        const handleNodeDelete = useCallback(
+            (tableId: string) => {
+                if (onTableDelete) {
+                    onTableDelete(new Set([tableId]));
+                }
+            },
+            [onTableDelete]
+        );
+
         // Sync nodes: preserve user-dragged positions for existing nodes; append new ones
         useEffect(() => {
             setNodes((prev) => {
@@ -110,25 +130,20 @@ const SqlDiagram = forwardRef<SqlDiagramHandle, SqlDiagramProps>(
                 return schema.tables.map((table) => {
                     const existing = existingMap.get(table.id);
                     if (existing) {
-                        // Refresh data/theme without moving the node
-                        return { ...existing, data: { schema: table, theme } as TableNodeData };
+                        // Refresh data/theme/onDelete without moving the node
+                        return { ...existing, data: { schema: table, theme, onDelete: handleNodeDelete } as TableNodeData };
                     }
                     // New node — place after current nodes
                     const newIdx = prev.length + newTables.indexOf(table);
-                    return buildNode(table, newIdx, theme);
+                    return buildNode(table, newIdx, theme, handleNodeDelete);
                 });
             });
-        }, [schema.tables, theme, setNodes]);
+        }, [schema.tables, theme, setNodes, handleNodeDelete]);
 
         // Sync edges whenever schema or theme changes
         useEffect(() => {
             setEdges(edgesFromSchema);
         }, [edgesFromSchema, setEdges]);
-
-        const onConnect = useCallback(
-            (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-            [setEdges]
-        );
 
         const handleNodesDelete = useCallback(
             (deletedNodes: Node[]) => {

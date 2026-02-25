@@ -11,11 +11,17 @@ interface AiChatSidebarProps {
     onClose: () => void;
     onImportSql: (sql: string) => void;
     onApplyAlter: (newSchema: SqlSchema) => void;
+    onDropTable: (tableIds: Set<string>) => void;
 }
 
 // Detect if an SQL snippet contains ALTER TABLE statements
 function hasAlterTable(sql: string): boolean {
-    return /^\s*ALTER\s+TABLE/im.test(sql);
+    return /^\s*ALTER\s+TABLE/im.test(sql) && !/^\s*DROP\s+TABLE/im.test(sql);
+}
+
+// Detect if an SQL snippet is a DROP TABLE statement
+function hasDropTable(sql: string): boolean {
+    return /^\s*DROP\s+TABLE/im.test(sql);
 }
 
 // Render message content with syntax-highlighted SQL blocks
@@ -23,17 +29,20 @@ function MessageContent({
     content,
     onImportSql,
     onApplyAlter,
+    onDropTable,
     theme,
 }: {
     content: string;
     onImportSql: (sql: string) => void;
     onApplyAlter: (sql: string) => void;
+    onDropTable: (sql: string) => void;
     theme: Theme;
 }) {
     const codeBg = theme === 'dark' ? 'bg-slate-950 border-slate-700' : 'bg-slate-100 border-slate-300';
     const codeText = theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700';
     const btnBg = 'bg-indigo-600 hover:bg-indigo-500 text-white';
     const alterBtnBg = 'bg-amber-600 hover:bg-amber-500 text-white';
+    const dropBtnBg = 'bg-rose-600 hover:bg-rose-500 text-white';
 
     // Split content into text parts and SQL code blocks
     const parts = content.split(/(```sql[\s\S]*?```)/gi);
@@ -45,12 +54,13 @@ function MessageContent({
                 if (sqlMatch) {
                     const sql = sqlMatch[1].trim();
                     const isAlter = hasAlterTable(sql);
+                    const isDrop = hasDropTable(sql);
                     return (
                         <div key={i} className={`rounded-lg border overflow-hidden ${codeBg}`}>
                             {/* SQL header label */}
                             <div className="px-3 py-1.5 flex items-center justify-between border-b border-inherit">
                                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
-                                    {isAlter ? 'ALTER TABLE' : 'SQL'}
+                                    {isDrop ? 'DROP TABLE' : isAlter ? 'ALTER TABLE' : 'SQL'}
                                 </span>
                             </div>
                             {/* SQL code display */}
@@ -59,7 +69,18 @@ function MessageContent({
                             </pre>
                             {/* Action button */}
                             <div className="px-3 py-2 border-t border-inherit flex justify-end">
-                                {isAlter ? (
+                                {isDrop ? (
+                                    <button
+                                        onClick={() => onDropTable(sql)}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${dropBtnBg}`}
+                                    >
+                                        {/* Trash icon */}
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Drop Table
+                                    </button>
+                                ) : isAlter ? (
                                     <button
                                         onClick={() => onApplyAlter(sql)}
                                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${alterBtnBg}`}
@@ -96,7 +117,7 @@ function MessageContent({
     );
 }
 
-export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImportSql, onApplyAlter }: AiChatSidebarProps) {
+export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImportSql, onApplyAlter, onDropTable }: AiChatSidebarProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -146,13 +167,26 @@ export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImport
             onApplyAlter(newSchema);
             setMessages((prev) => [
                 ...prev,
-                { role: 'assistant', content: '✅ Apply ALTER TABLE สำเร็จ! Diagram อัปเดตแล้ว' },
+                { role: 'assistant', content: 'Apply ALTER TABLE สำเร็จ! Diagram อัปเดตแล้ว' },
             ]);
         } catch (err) {
             console.error('Apply ALTER error:', err);
             setMessages((prev) => [
                 ...prev,
                 { role: 'assistant', content: '❌ ไม่สามารถ apply ALTER TABLE ได้ ตรวจสอบ syntax' },
+            ]);
+        }
+    };
+
+    // Handle DROP TABLE SQL from AI — remove table(s) from schema
+    const handleAiDropSql = (sql: string) => {
+        const matches = [...sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_`"'.]+)/gi)];
+        const ids = new Set(matches.map((m) => m[1].replace(/[`"']/g, '').split('.').pop() ?? ''));
+        if (ids.size > 0) {
+            onDropTable(ids);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: `Drop table สำเร็จ: ${[...ids].join(', ')}` },
             ]);
         }
     };
@@ -277,7 +311,7 @@ export default function AiChatSidebar({ isOpen, schema, theme, onClose, onImport
                             {/* Message bubble */}
                             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${msg.role === 'user' ? `${userBubble} rounded-tr-sm` : `${aiBubble} rounded-tl-sm`}`}>
                                 {msg.role === 'assistant' ? (
-                                    <MessageContent content={msg.content} onImportSql={onImportSql} onApplyAlter={handleAiAlterSql} theme={theme} />
+                                    <MessageContent content={msg.content} onImportSql={onImportSql} onApplyAlter={handleAiAlterSql} onDropTable={handleAiDropSql} theme={theme} />
                                 ) : (
                                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                                 )}
