@@ -86,10 +86,23 @@ function App() {
   };
 
   const handleTableDelete = (deletedIds: Set<string>) => {
+    // 1. Check for foreign key constraints before deleting
+    for (const fk of schema.foreignKeys) {
+      // If the target table is being deleted, BUT the source table is NOT being deleted
+      // -> This violates the constraint, just like in a real database.
+      if (deletedIds.has(fk.toTable) && !deletedIds.has(fk.fromTable)) {
+        alert(
+          `Cannot drop table '${fk.toTable}' referenced by a foreign key constraint from table '${fk.fromTable}'.\n\nYou must drop the foreign key or table '${fk.fromTable}' first.`
+        );
+        return; // Block the deletion entirely
+      }
+    }
+
+    // 2. Safe to delete
     setSchema((prev) => ({
       // Remove deleted tables from schema
       tables: prev.tables.filter((t) => !deletedIds.has(t.id)),
-      // Remove foreign keys that reference deleted tables
+      // Remove foreign keys that reference or are sourced from deleted tables
       foreignKeys: prev.foreignKeys.filter(
         (fk) => !deletedIds.has(fk.fromTable) && !deletedIds.has(fk.toTable)
       ),
