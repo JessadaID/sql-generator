@@ -48,8 +48,8 @@ const LOGO_COLORS: Record<Theme, string> = {
 const LEGEND_STYLES = {
     pk: { dark: 'text-amber-400', light: 'text-amber-600' },
     fk: { dark: 'text-indigo-400', light: 'text-indigo-600' },
-    nn: { dark: 'text-rose-400', light: 'text-slate-500' },
-    nnDot: { dark: 'bg-rose-400 w-1.5 h-1.5', light: 'bg-slate-400 w-1.5 h-1.5' },
+    nn: { dark: 'text-rose-400', light: 'text-rose-600' },
+    nnDot: { dark: 'bg-rose-400 w-1.5 h-1.5', light: 'bg-rose-500 w-1.5 h-1.5' },
     pkDot: { dark: 'bg-amber-400 w-2 h-2', light: 'bg-amber-500 w-2 h-2' },
     fkDot: { dark: 'bg-indigo-400 w-2 h-2', light: 'bg-indigo-500 w-2 h-2' },
     desc: { dark: 'text-slate-400', light: 'text-slate-500' },
@@ -110,8 +110,9 @@ export default function AppHeader({
                     Foreign Key
                 </LegendItem>
                 <LegendItem dotClass={LEGEND_STYLES.nnDot[theme]} textClass={LEGEND_STYLES.nn[theme]}>
+                    NN = Not Null
                     <span className={LEGEND_STYLES.desc[theme]}>
-                        NN = Not Null <span className="mx-1 opacity-50">·</span> UQ = Unique
+                        <span className="mx-1 opacity-50">·</span> UQ = Unique
                     </span>
                 </LegendItem>
             </div>
@@ -149,10 +150,10 @@ export default function AppHeader({
                 onClick={onToggleAi}
                 title={isAiOpen ? 'ปิด AI Assistant' : 'เปิด AI Assistant'}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isAiOpen
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
-                        : theme === 'dark'
-                            ? 'bg-slate-800 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300'
-                            : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                    : theme === 'dark'
+                        ? 'bg-slate-800 text-slate-300 hover:bg-indigo-600/20 hover:text-indigo-300'
+                        : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'
                     }`}
             >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
