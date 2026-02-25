@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Theme } from '../types/theme';
 import type { SqlSchema } from '../types/schema';
 import { generateSql, downloadSqlFile } from '../utils/sqlExporter';
+import { toast } from 'sonner';
 import type { ExportFormat } from '../utils/imageExporter';
 
 interface ExportModalProps {
@@ -49,7 +50,6 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
     const [selectedFormat, setSelectedFormat] = useState<ImageFormat>('png');
     const [selectedBg, setSelectedBg] = useState(''); // empty = transparent (PNG only)
     const [isExporting, setIsExporting] = useState(false);
-    const [exportError, setExportError] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
@@ -69,6 +69,7 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
         try {
             await navigator.clipboard.writeText(sql);
             setCopied(true);
+            toast.success('คัดลอก SQL เรียบร้อยแล้ว');
             setTimeout(() => setCopied(false), 2000);
         } catch {
             // Fallback copy via execCommand
@@ -79,6 +80,7 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
             document.execCommand('copy');
             document.body.removeChild(el);
             setCopied(true);
+            toast.success('คัดลอก SQL เรียบร้อยแล้ว');
             setTimeout(() => setCopied(false), 2000);
         }
     };
@@ -87,7 +89,6 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
 
     const handleExportImage = async () => {
         setIsExporting(true);
-        setExportError(null);
         // Treat empty string as transparent (undefined) for PNG
         const bg = selectedBg || undefined;
         try {
@@ -95,7 +96,7 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
             onClose();
         } catch (err) {
             console.error('Export image error:', err);
-            setExportError('ไม่สามารถ export ได้ กรุณาตรวจสอบว่า diagram มีตารางอยู่');
+            toast.error('ไม่สามารถ export ได้ กรุณาตรวจสอบว่า diagram มีตารางอยู่');
         } finally {
             setIsExporting(false);
         }
@@ -270,13 +271,6 @@ export default function ExportModal({ isOpen, onClose, schema, theme, onCaptureI
                             <div className={`rounded-lg px-4 py-3 text-xs leading-relaxed opacity-70 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
                                 The full diagram will be captured automatically — all tables will be included regardless of current zoom or scroll position.
                             </div>
-
-                            {/* Error message */}
-                            {exportError && (
-                                <div className="rounded-lg px-4 py-3 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30">
-                                    {exportError}
-                                </div>
-                            )}
                         </div>
 
                         {/* Footer */}

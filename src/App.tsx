@@ -10,6 +10,7 @@ import type { Theme, BackgroundType } from './types/theme';
 import type { ForeignKey, SqlSchema } from './types/schema';
 import type { ExportFormat } from './utils/imageExporter';
 import { parseSqlToSchema, applyAlterStatements } from './utils/sqlParser';
+import { Toaster, toast } from 'sonner';
 
 // Generate a unique key for deduplicating foreign keys
 const fkKey = (fk: ForeignKey) => `${fk.fromTable}.${fk.fromColumn}->${fk.toTable}.${fk.toColumn}`;
@@ -73,7 +74,7 @@ function App() {
         // Pure CREATE TABLE
         const newSchema = parseSqlToSchema(sql);
         if (newSchema.tables.length === 0) {
-          alert('No tables found in the provided SQL. Please check your syntax.');
+          toast.error('ไม่พบตารางใน SQL ที่ระบุ กรุณาตรวจสอบ Syntax');
           return;
         }
         setSchema((prev) => mergeSchemas(prev, newSchema));
@@ -81,7 +82,7 @@ function App() {
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to parse SQL.');
+      toast.error('ไม่สามารถ Parse SQL ได้ กรุณาตรวจสอบคำสั่งอีกครั้ง');
     }
   };
 
@@ -91,8 +92,8 @@ function App() {
       // If the target table is being deleted, BUT the source table is NOT being deleted
       // -> This violates the constraint, just like in a real database.
       if (deletedIds.has(fk.toTable) && !deletedIds.has(fk.fromTable)) {
-        alert(
-          `Cannot drop table '${fk.toTable}' referenced by a foreign key constraint from table '${fk.fromTable}'.\n\nYou must drop the foreign key or table '${fk.fromTable}' first.`
+        toast.error(
+          `ไม่สามารถลบตาราง '${fk.toTable}' ได้เนื่องจากมี Foreign Key จากตาราง '${fk.fromTable}' อ้างอิงอยู่\n\nโปรดลบ Foreign Key หรือตาราง '${fk.fromTable}' ก่อน`
         );
         return; // Block the deletion entirely
       }
@@ -110,9 +111,16 @@ function App() {
   };
 
   const handleClearAll = () => {
-    if (window.confirm('ต้องการลบตารางทั้งหมดออกจาก diagram ใช่ไหม?')) {
-      setSchema({ tables: [], foreignKeys: [] });
-    }
+    toast('ต้องการลบตารางทั้งหมดออกจาก diagram ใช่ไหม?', {
+      action: {
+        label: 'ตกลง (ลบทั้งหมด)',
+        onClick: () => setSchema({ tables: [], foreignKeys: [] }),
+      },
+      cancel: {
+        label: 'ยกเลิก',
+        onClick: () => { },
+      },
+    });
   };
 
   // Apply ALTER TABLE statements to current schema
@@ -122,6 +130,7 @@ function App() {
 
   return (
     <div className={`w-screen h-screen flex flex-col transition-colors duration-300 ${APP_STYLES[theme]}`}>
+      <Toaster position="top-center" theme={theme === 'dark' ? 'dark' : 'light'} richColors />
       <AppHeader
         theme={theme}
         bgType={bgType}
