@@ -1,5 +1,8 @@
 # SQL Generator
 
+![SQL Diagram Mode](./public/main.png)
+![ER Diagram Mode](./public/er.png)
+
 A web-based SQL schema diagram editor built with React, TypeScript, and Vite. The application allows developers to visually design, import, and export relational database schemas, with an integrated AI assistant powered by Groq for schema advice and SQL generation.
 
 ## Features
