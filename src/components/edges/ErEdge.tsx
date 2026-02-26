@@ -37,9 +37,8 @@ export default function ErEdge({
 
             {/* The Many side (Source) */}
             <g transform={`translate(${sourceX}, ${sourceY})`}>
-                <circle r={3} fill={color} cx={sourcePosition === 'right' ? -4 : 4} cy={0} />
-                <path d={`M ${sourcePosition === 'right' ? 0 : 0} 0 L ${sourcePosition === 'right' ? -12 : 12} -8 M ${sourcePosition === 'right' ? 0 : 0} 0 L ${sourcePosition === 'right' ? -12 : 12} 8`} stroke={color} strokeWidth={2} fill="none" />
-                <line x1={sourcePosition === 'right' ? -12 : 12} y1={-8} x2={sourcePosition === 'right' ? -12 : 12} y2={8} stroke={color} strokeWidth={2} />
+                <path d={`M ${sourcePosition === 'right' ? 12 : -12} 0 L 0 -8 M ${sourcePosition === 'right' ? 12 : -12} 0 L 0 8`} stroke={color} strokeWidth={2} fill="none" />
+                <line x1={sourcePosition === 'right' ? 12 : -12} y1={-8} x2={sourcePosition === 'right' ? 12 : -12} y2={8} stroke={color} strokeWidth={2} />
             </g>
 
             {/* The One side (Target) */}
